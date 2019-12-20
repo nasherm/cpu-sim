@@ -5,14 +5,14 @@ pub mod cpu{
     as well as execution unit interaction and the definition of the
     ISA
      */
-    #[derive(Clone)]
+    #[derive(Debug)]
     pub enum INSTR{
         MOVI(u32, u32), //  MOVI dest val (reg[dest]<-val) [dest] is a register
         MOV(u32, u32), // MOV dest src (reg[dest] <- reg[src])
         ADDI(u32, u32), // ADDI dest val (reg[dest] <- reg[dest] + val)
+        SUBI(u32, u32), // SUBI dest val (reg[dest] <-reg[dest] - val)
         ADDR(u32, u32, u32), // ADDR dest src1 src2 (reg[dest] <- reg[src1] + reg[src2])
         ADD (u32, u32, u32), // ADD dest val1 val2 (reg[dest] <- val1 + val2)
-        SUBI(u32, u32), // SUBI dest val (reg[dest] <-reg[dest] - val)
         SUBR(u32, u32, u32), // SUBR dest src1 src2 (reg[dest] <- reg[src1] - reg[src2])
         SUB (u32, u32, u32), // SUB dest val1 val2 (reg[dest]<- val1 - val2)
     }

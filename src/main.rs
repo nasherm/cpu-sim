@@ -5,7 +5,7 @@ fn main() {
     cpu.fdew();
     let parse = util::util::parseFile("tests/arith_mov");
     match parse{
-        Ok(_) => (),
+        Ok(v) => println!("{:?}", v),
         Err(e) => println!("{:?}", e),
     }
 }

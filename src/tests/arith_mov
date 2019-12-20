@@ -1,4 +1,4 @@
-MOVi r0 #42
+MOVI r0 #42
 MOV r0 r0
 ADDR r0 r0 r0
 ADDI r0 #42
