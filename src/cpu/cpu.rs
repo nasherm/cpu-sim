@@ -1,7 +1,8 @@
 use std::vec::Vec;
 use std::string::String;
 use super::units::ALU;
-
+use std::collections::VecDeque;
+#[allow(non_snake_case)]
 /*
 The main logic for the CPU. This includes key pipelining decoding of instructions,
 as well as execution unit interaction and the definition of the
@@ -33,7 +34,7 @@ impl Clock{
         }
     }
 
-    pub fn clockTick(&mut self) -> (){
+    pub fn tick(&mut self) -> (){
         self.state = (self.state + 1) % 4;
         self.clockTicks += 1;
     }
@@ -44,7 +45,7 @@ pub struct CPU {
     clock: Clock,
     instructionMem: Vec<INSTR>,
     currentInstruction: INSTR,
-    alus: Vec<ALU>,
+    aluTasks: VecDeque<ALU>
 }
 
 impl CPU{
@@ -54,9 +55,9 @@ impl CPU{
             clock: Clock::new(),
             instructionMem: Vec::new(),
             currentInstruction: INSTR::NOP,
-            alus: Vec::new(),
+            aluTasks: VecDeque::new(),
         }
-}
+    }
 
     // fetch decode execute writeback
     pub fn fdew(&mut self)->(){
@@ -68,14 +69,10 @@ impl CPU{
     }
 
     pub fn loadInstructions(&mut self, instructions: Vec<Result<INSTR, String>>) -> () {
-        for res in instructions{
-            match res{
-                Ok(i) => {
-                    let mut v: Vec<INSTR> = vec![i];
-                    v.append(&mut self.instructionMem);
-                    self.instructionMem = v
-                }
-                Err(e) => println!("Instruction not loaded | {:?}", e),
+        for res in instructions {
+            match res {
+                Ok(i) => self.instructionMem.push(i),
+                Err(e) => panic!("Instruction not loaded | {:?}", e),
             }
         }
     }
@@ -88,35 +85,40 @@ impl CPU{
             },
             None => (),
         }
+        self.clock.tick();
     }
 
-    fn issueALU(&mut self, x: u32, y: u32, f: impl FnMut(u32, u32)->u32 + 'static) -> () {
+    fn issueALUTask(&mut self, x: u32, y: u32, f: impl FnMut(u32, u32)->u32 + 'static) -> () {
         // TODO: keeping track of out-of-order execution results via reorder-buffer
         let mut alu = ALU::new();
         alu.issue(x, y, f);
-        self.alus.push(alu)
+        self.aluTasks.push_back(alu)
     }
 
 
     // Decode instruction in memory
     fn decode(&mut self) -> () {
         match self.currentInstruction{
-            INSTR::MOVI(dest, val) => self.registers[dest as usize] = val,
-            INSTR::MOV(dest, src) => self.registers[dest as usize] = self.registers[src as usize],
-            INSTR::ADD(_, x, y) => self.issueALU(x, y, |x, y| x + y),
-            INSTR::SUB(_, x, y) => self.issueALU(x, y, |x, y| x - y),
-            // TODO: ALU
+            INSTR::MOVI(dest, val) =>
+                self.registers[dest as usize] = val,
+            INSTR::MOV(dest, src) =>
+                self.registers[dest as usize] = self.registers[src as usize],
+            INSTR::ADD(_, x, y) =>
+                self.issueALUTask(x, y, |x, y| x + y),
+            INSTR::SUB(_, x, y) =>
+                self.issueALUTask(x, y, |x, y| x - y),
             _ => ()
         }
+        self.clock.tick();
     }
 
     // Execute instruction in memory
     fn execute(&mut self) -> () {
-        ()
+        self.clock.tick();
     }
 
     // Write back result
     fn writeback(&mut self) -> () {
-        ()
+        self.clock.tick();
     }
 }

@@ -1,10 +1,9 @@
 use std::fs::File;
 use std::io::{self, prelude::*, BufReader, Error, ErrorKind};
 use std::vec::Vec;
-use std::result;
 use std::string::String;
 use super::cpu::INSTR;
-
+#[allow(non_snake_case)]
 fn toInstr(v: &mut Vec<&str>) -> Result<INSTR, String>{
     let op = v[0];
     match op{

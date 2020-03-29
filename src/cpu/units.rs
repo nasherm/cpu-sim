@@ -25,5 +25,4 @@ impl ALU{
     pub fn execute(&mut self)->(){
         self.r = (self.f)(self.x, self.y);
     }
-
 }
