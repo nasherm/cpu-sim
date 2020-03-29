@@ -1,6 +1,6 @@
 use std::vec::Vec;
 use std::string::String;
-use super::units::ALU;
+use super::units::*;
 use std::collections::VecDeque;
 #[allow(non_snake_case)]
 /*
@@ -45,7 +45,7 @@ pub struct CPU {
     clock: Clock,
     instructionMem: Vec<INSTR>,
     currentInstruction: INSTR,
-    aluTasks: VecDeque<ALU>
+    aluTasks: VecDeque<Box<dyn Unit>>,
 }
 
 impl CPU{
@@ -87,12 +87,12 @@ impl CPU{
         }
         self.clock.tick();
     }
-
+    // TODO: some way of checking whether functional units can be issued i.e. check dependencies before calling issue
     fn issueALUTask(&mut self, x: u32, y: u32, f: impl FnMut(u32, u32)->u32 + 'static) -> () {
         // TODO: keeping track of out-of-order execution results via reorder-buffer
         let mut alu = ALU::new();
         alu.issue(x, y, f);
-        self.aluTasks.push_back(alu)
+        self.aluTasks.push_back(Box::new(alu));
     }
 
 
