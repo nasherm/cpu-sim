@@ -12,8 +12,8 @@ fn to_instr(v: &mut Vec<&str>) -> Result<INSTR, String>{
             let arg1 = v.pop();
             match (arg1, arg2){
                 (Some(x), Some(y)) =>{
-                    let dest = x[0..].to_string().parse::<u32>().unwrap();
-                    let val = y[0..].to_string().parse::<u32>().unwrap();
+                    let dest = x[1..].to_string().parse::<u32>().unwrap();
+                    let val  = y[1..].to_string().parse::<u32>().unwrap();
                     if op == "MOV" {
                         Ok(INSTR::MOV(dest, val))
                     }
@@ -36,9 +36,9 @@ fn to_instr(v: &mut Vec<&str>) -> Result<INSTR, String>{
             let arg1 = v.pop();
             match (arg1, arg2, arg3){
                 (Some(x), Some(y), Some(z)) => {
-                    let dest = x[0..].to_string().parse::<u32>().unwrap();
-                    let val1 = y[0..].to_string().parse::<u32>().unwrap();
-                    let val2 = z[0..].to_string().parse::<u32>().unwrap();
+                    let dest = x[1..].to_string().parse::<u32>().unwrap();
+                    let val1 = y[1..].to_string().parse::<u32>().unwrap();
+                    let val2 = z[1..].to_string().parse::<u32>().unwrap();
                     if op == "ADD"{
                         Ok(INSTR::ADD(dest, val1, val2))
                     }
@@ -87,7 +87,7 @@ mod tests{
 
     #[test]
     fn parse_mov() {
-        let mut instr = vec!["MOV", "0", "1"];
+        let mut instr = vec!["MOV", "r0", "#1"];
         let r = to_instr(&mut instr);
         match r{
             Ok(INSTR::MOV(0, 1)) => (),
@@ -96,7 +96,7 @@ mod tests{
     }
     #[test]
     fn parse_movi() {
-        let mut instr = vec!["MOVI", "0", "1"];
+        let mut instr = vec!["MOVI", "r0", "#1"];
         let r = to_instr(&mut instr);
         match r{
             Ok(INSTR::MOVI(0, 1)) => (),
@@ -105,7 +105,7 @@ mod tests{
     }
     #[test]
     fn parse_addi() {
-        let mut instr = vec!["ADDI", "0", "1"];
+        let mut instr = vec!["ADDI", "r0", "#1"];
         let r = to_instr(&mut instr);
         match r{
             Ok(INSTR::ADDI(0, 1)) => (),
@@ -114,7 +114,7 @@ mod tests{
     }
     #[test]
     fn parse_subi() {
-        let mut instr = vec!["SUBI", "0", "1"];
+        let mut instr = vec!["SUBI", "r0", "#1"];
         let r = to_instr(&mut instr);
         match r{
             Ok(INSTR::SUBI(0, 1)) => (),
@@ -123,7 +123,7 @@ mod tests{
     }
     #[test]
     fn parse_add() {
-        let mut instr = vec!["ADD", "0", "1", "2"];
+        let mut instr = vec!["ADD", "r0", "#1", "#2"];
         let r = to_instr(&mut instr);
         match r{
             Ok(INSTR::ADD(0, 1, 2)) => (),
@@ -132,7 +132,7 @@ mod tests{
     }
     #[test]
     fn parse_addr() {
-        let mut instr = vec!["ADDR", "0", "1", "2"];
+        let mut instr = vec!["ADDR", "r0", "r1", "r2"];
         let r = to_instr(&mut instr);
         match r{
             Ok(INSTR::ADDR(0, 1, 2)) => (),
@@ -141,7 +141,7 @@ mod tests{
     }
     #[test]
     fn parse_sub() {
-        let mut instr = vec!["SUB", "0", "1", "2"];
+        let mut instr = vec!["SUB", "r0", "#1", "#2"];
         let r = to_instr(&mut instr);
         match r{
             Ok(INSTR::SUB(0, 1, 2)) => (),
@@ -150,7 +150,7 @@ mod tests{
     }
     #[test]
     fn parse_subr() {
-        let mut instr = vec!["SUBR", "0", "1", "2"];
+        let mut instr = vec!["SUBR", "r0", "r1", "r2"];
         let r = to_instr(&mut instr);
         match r{
             Ok(INSTR::SUBR(0, 1, 2)) => (),

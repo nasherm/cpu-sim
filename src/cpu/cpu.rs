@@ -59,9 +59,7 @@ pub struct CPU {
     current_instruction: INSTR,
     alu_tasks: VecDeque<Box<dyn Unit>>,
     next_stage: Stage
-
 }
-
 
 impl CPU{
     pub fn new() -> CPU{
