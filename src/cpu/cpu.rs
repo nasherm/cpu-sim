@@ -77,6 +77,10 @@ impl CPU{
         self.instruction_mem = instrs.clone();
     }
 
+    pub fn registers(& self) -> &[u32; 256]{
+        &self.registers
+    }
+
     // fetch decode execute writeback
     pub fn clock_tick(&mut self)->(){
         self.next_stage =  match self.next_stage {
