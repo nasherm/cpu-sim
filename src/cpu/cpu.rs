@@ -8,8 +8,8 @@ The main logic for the CPU. This includes key pipelining decoding of instruction
 as well as execution unit interaction and the definition of the
 ISA
     */
-#[derive(Debug)]
-pub enum INSTR{
+#[derive(Debug, Clone, PartialEq)]
+pub enum INSTR {
     MOVI(u32, u32), //  MOVI dest val (reg[dest]<-val) [dest] is a register
     MOV(u32, u32), // MOV dest src (reg[dest] <- reg[src])
     ADDI(u32, u32), // ADDI dest val (reg[dest] <- reg[dest] + val)
@@ -23,102 +23,155 @@ pub enum INSTR{
 
 struct Clock{
     state: u8,
-    clockTicks: u32,
+    clock_ticks: u32,
 }
 
 impl Clock{
     pub fn new() -> Clock{
         Clock{
             state: 0,
-            clockTicks: 0,
+            clock_ticks: 0,
         }
     }
 
     pub fn tick(&mut self) -> (){
         self.state = (self.state + 1) % 4;
-        self.clockTicks += 1;
+        self.clock_ticks += 1;
     }
+
+    pub fn tick_number(&self) -> u32 {
+        return self.clock_ticks
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum Stage {
+    Fetch,
+    Decode,
+    Execute,
+    WriteBack
 }
 
 pub struct CPU {
     registers: [u32; 256],
     clock: Clock,
-    instructionMem: Vec<INSTR>,
-    currentInstruction: INSTR,
-    aluTasks: VecDeque<Box<dyn Unit>>,
+    instruction_mem: Vec<INSTR>,
+    current_instruction: INSTR,
+    alu_tasks: VecDeque<Box<dyn Unit>>,
+    next_stage: Stage
+
 }
+
 
 impl CPU{
     pub fn new() -> CPU{
         CPU{
             registers: [0; 256],
             clock: Clock::new(),
-            instructionMem: Vec::new(),
-            currentInstruction: INSTR::NOP,
-            aluTasks: VecDeque::new(),
+            instruction_mem: Vec::new(),
+            current_instruction: INSTR::NOP,
+            alu_tasks: VecDeque::new(),
+            next_stage: Stage::Fetch
         }
     }
 
-    // fetch decode execute writeback
-    pub fn fdew(&mut self)->(){
-        self.fetch();
-        self.decode();
-        self.execute();
-        self.writeback();
-        ()
+    pub fn load_instr_vec(&mut self, instrs:&Vec<INSTR>) {
+        self.instruction_mem = instrs.clone();
     }
 
-    pub fn loadInstructions(&mut self, instructions: Vec<Result<INSTR, String>>) -> () {
+    // fetch decode execute writeback
+    pub fn clock_tick(&mut self)->(){
+        self.next_stage =  match self.next_stage {
+            Stage::Fetch => self.fetch(),
+            Stage::Decode => self.decode(),
+            Stage::Execute => self.execute(),
+            Stage::WriteBack => self.writeback(),
+        };
+        self.clock.tick()
+    }
+
+    pub fn load_instructions(&mut self, instructions: Vec<Result<INSTR, String>>) -> () {
         for res in instructions {
             match res {
-                Ok(i) => self.instructionMem.push(i),
+                Ok(i) => self.instruction_mem.push(i),
                 Err(e) => panic!("Instruction not loaded | {:?}", e),
             }
         }
     }
 
     // Fetch instruction from memory
-    fn fetch(&mut self) ->() {
-        match self.instructionMem.pop() {
+    fn fetch(&mut self) ->Stage{
+        match self.instruction_mem.pop() {
+            // MOV(i) are single cycle instructions
+            Some(INSTR::MOVI(dest, val)) => {
+                self.registers[dest as usize] = val;
+                Stage::Fetch
+            }
+            Some(INSTR::MOV(dest, src)) => {
+                self.registers[dest as usize] = self.registers[src as usize];
+                Stage::Fetch
+            }
             Some(i) => {
-                self.currentInstruction = i
+                self.current_instruction = i;
+                Stage::Decode
             },
-            None => (),
+            None => Stage::Decode,
         }
-        self.clock.tick();
     }
     // TODO: some way of checking whether functional units can be issued i.e. check dependencies before calling issue
-    fn issueALUTask(&mut self, x: u32, y: u32, f: impl FnMut(u32, u32)->u32 + 'static) -> () {
+    fn issue_alutask(&mut self, x: u32, y: u32, f: impl FnMut(u32, u32)->u32 + 'static) -> () {
         // TODO: keeping track of out-of-order execution results via reorder-buffer
         let mut alu = ALU::new();
         alu.issue(x, y, f);
-        self.aluTasks.push_back(Box::new(alu));
+        self.alu_tasks.push_back(Box::new(alu));
     }
 
 
     // Decode instruction in memory
-    fn decode(&mut self) -> () {
-        match self.currentInstruction{
-            INSTR::MOVI(dest, val) =>
-                self.registers[dest as usize] = val,
-            INSTR::MOV(dest, src) =>
-                self.registers[dest as usize] = self.registers[src as usize],
-            INSTR::ADD(_, x, y) =>
-                self.issueALUTask(x, y, |x, y| x + y),
-            INSTR::SUB(_, x, y) =>
-                self.issueALUTask(x, y, |x, y| x - y),
-            _ => ()
+    fn decode(&mut self) -> Stage {
+        match self.current_instruction {
+            INSTR::ADD(_, x, y) => {
+                self.issue_alutask(x, y, |x, y| x + y);
+                Stage::Execute
+            }
+            INSTR::SUB(_, x, y) => {
+                self.issue_alutask(x, y, |x, y| x - y);
+                Stage::Execute
+            }
+            _ => Stage::Execute
         }
-        self.clock.tick();
     }
 
     // Execute instruction in memory
-    fn execute(&mut self) -> () {
-        self.clock.tick();
+    fn execute(&mut self) -> Stage {
+        Stage::WriteBack
     }
 
     // Write back result
-    fn writeback(&mut self) -> () {
-        self.clock.tick();
+    fn writeback(&mut self) -> Stage {
+        Stage::Fetch
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::cpu::cpu::*;
+
+    #[test]
+    fn mov_tests(){
+        let mut cpu = CPU::new();
+        cpu.load_instr_vec(&vec![
+            INSTR::MOV(0, 2),
+            INSTR::MOVI(2, 42)
+        ]);
+        cpu.clock_tick();
+        assert_eq!(cpu.clock.tick_number(), 1);
+        assert_eq!(cpu.registers[2], 42);
+        assert_eq!(cpu.next_stage, Stage::Fetch);
+        cpu.clock_tick();
+        assert_eq!(cpu.clock.tick_number(), 2);
+        assert_eq!(cpu.registers[0], 42);
+        assert_eq!(cpu.next_stage, Stage::Fetch);
     }
 }
