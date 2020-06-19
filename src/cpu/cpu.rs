@@ -2,6 +2,7 @@ use std::vec::Vec;
 use std::string::String;
 use super::units::*;
 use std::collections::VecDeque;
+use std::option::Option;
 #[allow(non_snake_case)]
 /*
 The main logic for the CPU. This includes key pipelining decoding of instructions,
@@ -21,31 +22,9 @@ pub enum INSTR {
     NOP,
 }
 
-struct Clock{
-    state: u8,
-    clock_ticks: u32,
-}
-
-impl Clock{
-    pub fn new() -> Clock{
-        Clock{
-            state: 0,
-            clock_ticks: 0,
-        }
-    }
-
-    pub fn tick(&mut self) -> (){
-        self.state = (self.state + 1) % 4;
-        self.clock_ticks += 1;
-    }
-
-    pub fn tick_number(&self) -> u32 {
-        return self.clock_ticks
-    }
-}
 
 #[derive(Debug, PartialEq)]
-enum Stage {
+pub enum Stage {
     Fetch,
     Decode,
     Execute,
@@ -53,23 +32,27 @@ enum Stage {
 }
 
 pub struct CPU {
-    registers: [u32; 256],
-    clock: Clock,
-    instruction_mem: Vec<INSTR>,
-    current_instruction: INSTR,
+    pub instruction_mem: Vec<INSTR>,
+    pub registers: [u32; 256],
+    pub current_instruction: INSTR,
+    pub prev_instruction: INSTR,
+    pub next_instruction: INSTR,
+    pub next_stage: Stage,
+    ticks: u32,
     alu_tasks: VecDeque<Box<dyn Unit>>,
-    next_stage: Stage
 }
 
 impl CPU{
     pub fn new() -> CPU{
         CPU{
-            registers: [0; 256],
-            clock: Clock::new(),
             instruction_mem: Vec::new(),
+            registers: [0; 256],
             current_instruction: INSTR::NOP,
+            prev_instruction: INSTR::NOP,
+            next_instruction: INSTR::NOP,
+            next_stage: Stage::Fetch,
+            ticks: 0,
             alu_tasks: VecDeque::new(),
-            next_stage: Stage::Fetch
         }
     }
 
@@ -89,7 +72,7 @@ impl CPU{
             Stage::Execute => self.execute(),
             Stage::WriteBack => self.writeback(),
         };
-        self.clock.tick()
+        self.ticks += 1;
     }
 
     pub fn load_instructions(&mut self, instructions: Vec<Result<INSTR, String>>) -> () {
@@ -101,23 +84,36 @@ impl CPU{
         }
     }
 
+    fn set_next_instruction (&mut self) {
+        let instr = self.instruction_mem.pop();
+        self.prev_instruction = self.current_instruction.clone();
+        self.current_instruction =  match instr {
+            Some(i) => i,
+            _ => INSTR::NOP
+        };
+        let instr_len = self.instruction_mem.len();
+        if (instr_len > 0) {
+            self.next_instruction = self.instruction_mem[instr_len - 1].clone();
+        } else {
+            self.next_instruction = INSTR::NOP;
+        }
+    }
+
     // Fetch instruction from memory
     fn fetch(&mut self) ->Stage{
-        match self.instruction_mem.pop() {
+        self.set_next_instruction();
+        match self.current_instruction {
             // MOV(i) are single cycle instructions
-            Some(INSTR::MOVI(dest, val)) => {
+            INSTR::MOVI(dest, val) => {
                 self.registers[dest as usize] = val;
                 Stage::Fetch
             }
-            Some(INSTR::MOV(dest, src)) => {
+            INSTR::MOV(dest, src) => {
                 self.registers[dest as usize] = self.registers[src as usize];
                 Stage::Fetch
             }
-            Some(i) => {
-                self.current_instruction = i;
-                Stage::Decode
-            },
-            None => Stage::Decode,
+            INSTR::NOP => Stage::Fetch,
+            _ => Stage::Decode
         }
     }
     // TODO: some way of checking whether functional units can be issued i.e. check dependencies before calling issue
