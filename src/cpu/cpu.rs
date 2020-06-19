@@ -2,8 +2,6 @@ use std::vec::Vec;
 use std::string::String;
 use super::units::*;
 use std::collections::VecDeque;
-use std::option::Option;
-#[allow(non_snake_case)]
 /*
 The main logic for the CPU. This includes key pipelining decoding of instructions,
 as well as execution unit interaction and the definition of the
@@ -92,7 +90,7 @@ impl CPU{
             _ => INSTR::NOP
         };
         let instr_len = self.instruction_mem.len();
-        if (instr_len > 0) {
+        if instr_len > 0 {
             self.next_instruction = self.instruction_mem[instr_len - 1].clone();
         } else {
             self.next_instruction = INSTR::NOP;
@@ -164,11 +162,11 @@ mod tests {
             INSTR::MOVI(2, 42)
         ]);
         cpu.clock_tick();
-        assert_eq!(cpu.clock.tick_number(), 1);
+        assert_eq!(cpu.ticks, 1);
         assert_eq!(cpu.registers[2], 42);
         assert_eq!(cpu.next_stage, Stage::Fetch);
         cpu.clock_tick();
-        assert_eq!(cpu.clock.tick_number(), 2);
+        assert_eq!(cpu.ticks, 2);
         assert_eq!(cpu.registers[0], 42);
         assert_eq!(cpu.next_stage, Stage::Fetch);
     }

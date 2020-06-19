@@ -68,9 +68,10 @@ impl Debugger{
 
     pub fn event_loop(&mut self) -> () {
         println!("Welcome to the debugger");
+        self.print_commands();
         loop {
             print!("+> ");
-            io::stdout().flush();
+            let _ = io::stdout().flush();
             let line:String = read!("{}\n");
             match line.as_str(){
                 "q" => break,
