@@ -2,11 +2,7 @@ use std::vec::Vec;
 use std::string::String;
 use super::units::*;
 use std::collections::VecDeque;
-/*
-The main logic for the CPU. This includes key pipelining decoding of instructions,
-as well as execution unit interaction and the definition of the
-ISA
-    */
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Instr {
     Movi(u32, u32), //  movi dest val (reg[dest]<-val) [dest] is a register
@@ -39,6 +35,7 @@ pub struct CPU {
     ticks: u32,
     task_units: VecDeque<Box<dyn Unit>>,
 }
+
 
 impl CPU{
     pub fn new() -> CPU{
@@ -128,23 +125,37 @@ impl CPU{
         self.task_units.push_back(Box::new(alu));
     }
 
-
     // Decode instruction in memory
     fn decode(&mut self) -> Stage {
+        let add = |x:u32, y:u32| x + y;
+        let sub = |x, y| x - y;
         let current_instruction = self.current_instruction.clone();
         match self.current_instruction {
-            Instr::Add(_, src1, src2) => {
+            Instr::Add(_, src1, src2)
+            | Instr::Sub(_, src1, src2) => {
                 let x = self.registers[src1 as usize];
                 let y = self.registers[src2 as usize];
-                self.issue_alutask(current_instruction, x, y, |x, y| x + y);
+                match self.current_instruction{
+                    Instr::Add(_, _, _)=>
+                        self.issue_alutask(current_instruction, x, y, add),
+                    Instr::Sub(_, _, _) =>
+                        self.issue_alutask(current_instruction, x, y, sub),
+                    _ => (),
+                };
                 Stage::Execute
-            }
-            Instr::Sub(_, src1, src2) => {
-                let x = self.registers[src1 as usize];
-                let y = self.registers[src2 as usize];
-                self.issue_alutask(current_instruction, x, y, |x, y| x - y);
+            },
+            Instr::Addi(dest, data)
+            | Instr::Subi(dest, data) => {
+                let x = self.registers[dest as usize];
+                match self.current_instruction {
+                    Instr::Addi(_, _) =>
+                        self.issue_alutask(current_instruction, x, data, add),
+                    Instr::Subi(_, _) =>
+                        self.issue_alutask(current_instruction, x, data, sub),
+                    _ => ()
+                };
                 Stage::Execute
-            }
+            },
             _ => Stage::Execute
         }
     }
@@ -164,6 +175,8 @@ impl CPU{
             match t.instr() {
                 Instr::Add(dest, _, _) => self.registers[dest as usize] = result,
                 Instr::Sub(dest, _, _) => self.registers[dest as usize] = result,
+                Instr::Addi(dest, _) => self.registers[dest as usize] = result,
+                Instr::Subi(dest, _) => self.registers[dest as usize] = result,
                 _ => ()
             }
         }
@@ -197,13 +210,26 @@ mod tests {
     #[test]
     fn add_sub_tests() {
         let mut cpu = CPU::new();
-        let mut instructions = VecDeque::new();
-        instructions.push_back(Instr::Movi(0, 42));
-        instructions.push_back(Instr::Add(1, 0, 0));
-        instructions.push_back(Instr::Sub(2, 1, 0));
-        cpu.load_instr_vec(&instructions);
+        let mut instrs = VecDeque::new();
+        instrs.push_back(Instr::Movi(0, 42));
+        instrs.push_back(Instr::Add(1, 0, 0));
+        instrs.push_back(Instr::Sub(2, 1, 0));
+        cpu.load_instr_vec(&instrs);
         cpu.run_to_end();
         assert_eq!(cpu.registers[1], 84);
         assert_eq!(cpu.registers[2], 42);
+    }
+
+    #[test]
+    fn addi_subi_tests() {
+        let mut cpu = CPU::new();
+        let mut instrs = VecDeque::new();
+        instrs.push_back(Instr::Addi(0, 42));
+        instrs.push_back(Instr::Addi(1, 32));
+        instrs.push_back(Instr::Subi(1, 10));
+        cpu.load_instr_vec(&instrs);
+        cpu.run_to_end();
+        assert_eq!(cpu.registers[0], 42);
+        assert_eq!(cpu.registers[1], 22);
     }
 }
