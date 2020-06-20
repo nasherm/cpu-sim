@@ -8,16 +8,16 @@ as well as execution unit interaction and the definition of the
 ISA
     */
 #[derive(Debug, Clone, PartialEq)]
-pub enum INSTR {
-    MOVI(u32, u32), //  movi dest val (reg[dest]<-val) [dest] is a register
-    MOV(u32, u32), // mov dest src (reg[dest] <- reg[src])
-    ADDI(u32, u32), // addi dest val (reg[dest] <- reg[dest] + val)
-    SUBI(u32, u32), // subi dest val (reg[dest] <-reg[dest] - val)
-    ADDR(u32, u32, u32), // addr dest src1 src2 (reg[dest] <- reg[src1] + reg[src2])
-    ADD (u32, u32, u32), // add dest val1 val2 (reg[dest] <- val1 + val2)
-    SUBR(u32, u32, u32), // subr dest src1 src2 (reg[dest] <- reg[src1] - reg[src2])
-    SUB (u32, u32, u32), // sub dest val1 val2 (reg[dest]<- val1 - val2)
-    NOP,
+pub enum Instr {
+    Movi(u32, u32), //  movi dest val (reg[dest]<-val) [dest] is a register
+    Mov(u32, u32), // mov dest src (reg[dest] <- reg[src])
+    Addi(u32, u32), // addi dest val (reg[dest] <- reg[dest] + val)
+    Subi(u32, u32), // subi dest val (reg[dest] <-reg[dest] - val)
+    Addr(u32, u32, u32), // addr dest src1 src2 (reg[dest] <- reg[src1] + reg[src2])
+    Add(u32, u32, u32), // add dest val1 val2 (reg[dest] <- val1 + val2)
+    Subr(u32, u32, u32), // subr dest src1 src2 (reg[dest] <- reg[src1] - reg[src2])
+    Sub(u32, u32, u32), // sub dest val1 val2 (reg[dest]<- val1 - val2)
+    Nop,
 }
 
 
@@ -30,14 +30,14 @@ pub enum Stage {
 }
 
 pub struct CPU {
-    pub instruction_mem: Vec<INSTR>,
+    pub instruction_mem: Vec<Instr>,
     pub registers: [u32; 256],
-    pub current_instruction: INSTR,
-    pub prev_instruction: INSTR,
-    pub next_instruction: INSTR,
+    pub current_instruction: Instr,
+    pub prev_instruction: Instr,
+    pub next_instruction: Instr,
     pub next_stage: Stage,
     ticks: u32,
-    alu_tasks: VecDeque<Box<dyn Unit>>,
+    task_units: VecDeque<Box<dyn Unit>>,
 }
 
 impl CPU{
@@ -45,16 +45,16 @@ impl CPU{
         CPU{
             instruction_mem: Vec::new(),
             registers: [0; 256],
-            current_instruction: INSTR::NOP,
-            prev_instruction: INSTR::NOP,
-            next_instruction: INSTR::NOP,
+            current_instruction: Instr::Nop,
+            prev_instruction: Instr::Nop,
+            next_instruction: Instr::Nop,
             next_stage: Stage::Fetch,
             ticks: 0,
-            alu_tasks: VecDeque::new(),
+            task_units: VecDeque::new(),
         }
     }
 
-    pub fn load_instr_vec(&mut self, instrs:&Vec<INSTR>) {
+    pub fn load_instr_vec(&mut self, instrs:&Vec<Instr>) {
         self.instruction_mem = instrs.clone();
     }
 
@@ -73,7 +73,7 @@ impl CPU{
         self.ticks += 1;
     }
 
-    pub fn load_instructions(&mut self, instructions: Vec<Result<INSTR, String>>) -> () {
+    pub fn load_instructions(&mut self, instructions: Vec<Result<Instr, String>>) -> () {
         for res in instructions {
             match res {
                 Ok(i) => self.instruction_mem.push(i),
@@ -87,13 +87,13 @@ impl CPU{
         self.prev_instruction = self.current_instruction.clone();
         self.current_instruction =  match instr {
             Some(i) => i,
-            _ => INSTR::NOP
+            _ => Instr::Nop
         };
         let instr_len = self.instruction_mem.len();
         if instr_len > 0 {
             self.next_instruction = self.instruction_mem[instr_len - 1].clone();
         } else {
-            self.next_instruction = INSTR::NOP;
+            self.next_instruction = Instr::Nop;
         }
     }
 
@@ -102,15 +102,15 @@ impl CPU{
         self.set_next_instruction();
         match self.current_instruction {
             // MOV(i) are single cycle instructions
-            INSTR::MOVI(dest, val) => {
+            Instr::Movi(dest, val) => {
                 self.registers[dest as usize] = val;
                 Stage::Fetch
             }
-            INSTR::MOV(dest, src) => {
+            Instr::Mov(dest, src) => {
                 self.registers[dest as usize] = self.registers[src as usize];
                 Stage::Fetch
             }
-            INSTR::NOP => Stage::Fetch,
+            Instr::Nop => Stage::Fetch,
             _ => Stage::Decode
         }
     }
@@ -119,18 +119,18 @@ impl CPU{
     fn issue_alutask(&mut self, x: u32, y: u32, f: impl FnMut(u32, u32)->u32 + 'static) -> () {
         let mut alu = ALU::new();
         alu.issue(x, y, f);
-        self.alu_tasks.push_back(Box::new(alu));
+        self.task_units.push_back(Box::new(alu));
     }
 
 
     // Decode instruction in memory
     fn decode(&mut self) -> Stage {
         match self.current_instruction {
-            INSTR::ADD(_, x, y) => {
+            Instr::Add(_, x, y) => {
                 self.issue_alutask(x, y, |x, y| x + y);
                 Stage::Execute
             }
-            INSTR::SUB(_, x, y) => {
+            Instr::Sub(_, x, y) => {
                 self.issue_alutask(x, y, |x, y| x - y);
                 Stage::Execute
             }
@@ -140,6 +140,9 @@ impl CPU{
 
     // Execute instruction in memory
     fn execute(&mut self) -> Stage {
+        // for t in self.task_units {
+        //     ()
+        // }
         Stage::WriteBack
     }
 
@@ -158,8 +161,8 @@ mod tests {
     fn mov_tests(){
         let mut cpu = CPU::new();
         cpu.load_instr_vec(&vec![
-            INSTR::MOV(0, 2),
-            INSTR::MOVI(2, 42)
+            Instr::Mov(0, 2),
+            Instr::Movi(2, 42)
         ]);
         cpu.clock_tick();
         assert_eq!(cpu.ticks, 1);

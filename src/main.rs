@@ -1,7 +1,7 @@
 pub mod cpu;
-pub mod programs;
+pub mod debugger;
 fn main() {
-    let mut debug = programs::Debugger::new();
+    let mut debug = debugger::Debugger::new();
     debug.event_loop()
 }
 

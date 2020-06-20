@@ -2,9 +2,9 @@ use std::fs::File;
 use std::io::{self, prelude::*, BufReader, Error, ErrorKind};
 use std::vec::Vec;
 use std::string::String;
-use super::cpu::INSTR;
+use super::cpu::Instr;
 
-fn to_instr(v: &mut Vec<&str>) -> Result<INSTR, String>{
+fn to_instr(v: &mut Vec<&str>) -> Result<Instr, String>{
     let op = v[0];
     match op{
         "mov" | "movi" | "addi" | "subi" =>{
@@ -15,16 +15,16 @@ fn to_instr(v: &mut Vec<&str>) -> Result<INSTR, String>{
                     let dest = x[1..].to_string().parse::<u32>().unwrap();
                     let val  = y[1..].to_string().parse::<u32>().unwrap();
                     if op == "mov" {
-                        Ok(INSTR::MOV(dest, val))
+                        Ok(Instr::Mov(dest, val))
                     }
                     else if op == "movi" {
-                        Ok(INSTR::MOVI(dest, val))
+                        Ok(Instr::Movi(dest, val))
                     }
                     else if op == "addi"{
-                        Ok(INSTR::ADDI(dest, val))
+                        Ok(Instr::Addi(dest, val))
                     }
                     else {
-                        Ok(INSTR::SUBI(dest, val))
+                        Ok(Instr::Subi(dest, val))
                     }
                 }
                 _ => Err(format!("Not enough arguments to instr = {}", op)),
@@ -40,16 +40,16 @@ fn to_instr(v: &mut Vec<&str>) -> Result<INSTR, String>{
                     let val1 = y[1..].to_string().parse::<u32>().unwrap();
                     let val2 = z[1..].to_string().parse::<u32>().unwrap();
                     if op == "add"{
-                        Ok(INSTR::ADD(dest, val1, val2))
+                        Ok(Instr::Add(dest, val1, val2))
                     }
                     else if op == "sub"{
-                        Ok(INSTR::SUB(dest, val1, val2))
+                        Ok(Instr::Sub(dest, val1, val2))
                     }
                     else if op == "addr" {
-                        Ok(INSTR::ADDR(dest, val1, val2))
+                        Ok(Instr::Addr(dest, val1, val2))
                     }
                     else {
-                        Ok(INSTR::SUBR(dest, val1, val2))
+                        Ok(Instr::Subr(dest, val1, val2))
                     }
                 },
                 _ => Err(format!("Not enough arguments to instr = {}", op)),
@@ -59,7 +59,7 @@ fn to_instr(v: &mut Vec<&str>) -> Result<INSTR, String>{
     }
 }
 
-pub fn parse_file(file_path: &'static str ) -> io::Result<Vec<Result<INSTR, String>>> {
+pub fn parse_file(file_path: &str ) -> io::Result<Vec<Result<Instr, String>>> {
     let file = File::open(file_path);
     let mut instr= Vec::new();
     match file {
@@ -80,17 +80,22 @@ pub fn parse_file(file_path: &'static str ) -> io::Result<Vec<Result<INSTR, Stri
     }
 }
 
+pub fn parse_string(string:&String) -> Result<Instr, String> {
+    let mut collect = string.split(' ').collect();
+    to_instr(&mut collect)
+}
+
 #[cfg(test)]
 mod tests{
     use crate::cpu::util::*;
-    use crate::cpu::cpu::INSTR;
+    use crate::cpu::cpu::Instr;
 
     #[test]
     fn parse_mov() {
         let mut instr = vec!["mov", "r0", "#1"];
         let r = to_instr(&mut instr);
         match r{
-            Ok(INSTR::MOV(0, 1)) => (),
+            Ok(Instr::Mov(0, 1)) => (),
             _ => panic!(format!("Failed to parse MOV instruction = {:?}", instr))
         }
     }
@@ -99,7 +104,7 @@ mod tests{
         let mut instr = vec!["movi", "r0", "#1"];
         let r = to_instr(&mut instr);
         match r{
-            Ok(INSTR::MOVI(0, 1)) => (),
+            Ok(Instr::Movi(0, 1)) => (),
             _ => panic!(format!("Failed to parse MOVI instruction = {:?}", instr))
         }
     }
@@ -108,7 +113,7 @@ mod tests{
         let mut instr = vec!["addi", "r0", "#1"];
         let r = to_instr(&mut instr);
         match r{
-            Ok(INSTR::ADDI(0, 1)) => (),
+            Ok(Instr::Addi(0, 1)) => (),
             _ => panic!(format!("Failed to parse ADDi instruction = {:?}", instr))
         }
     }
@@ -117,7 +122,7 @@ mod tests{
         let mut instr = vec!["subi", "r0", "#1"];
         let r = to_instr(&mut instr);
         match r{
-            Ok(INSTR::SUBI(0, 1)) => (),
+            Ok(Instr::Subi(0, 1)) => (),
             _ => panic!(format!("Failed to parse SUBI instruction = {:?}", instr))
         }
     }
@@ -126,7 +131,7 @@ mod tests{
         let mut instr = vec!["add", "r0", "#1", "#2"];
         let r = to_instr(&mut instr);
         match r{
-            Ok(INSTR::ADD(0, 1, 2)) => (),
+            Ok(Instr::Add(0, 1, 2)) => (),
             _ => panic!(format!("Failed to parse ADD instruction = {:?}", instr))
         }
     }
@@ -135,7 +140,7 @@ mod tests{
         let mut instr = vec!["addr", "r0", "r1", "r2"];
         let r = to_instr(&mut instr);
         match r{
-            Ok(INSTR::ADDR(0, 1, 2)) => (),
+            Ok(Instr::Addr(0, 1, 2)) => (),
             _ => panic!(format!("Failed to parse ADDR instruction = {:?}", instr))
         }
     }
@@ -144,7 +149,7 @@ mod tests{
         let mut instr = vec!["sub", "r0", "#1", "#2"];
         let r = to_instr(&mut instr);
         match r{
-            Ok(INSTR::SUB(0, 1, 2)) => (),
+            Ok(Instr::Sub(0, 1, 2)) => (),
             _ => panic!(format!("Failed to parse SUB instruction = {:?}", instr))
         }
     }
@@ -153,23 +158,23 @@ mod tests{
         let mut instr = vec!["subr", "r0", "r1", "r2"];
         let r = to_instr(&mut instr);
         match r{
-            Ok(INSTR::SUBR(0, 1, 2)) => (),
+            Ok(Instr::Subr(0, 1, 2)) => (),
             _ => panic!(format!("Failed to parse SUBR instruction = {:?}", instr))
         }
     }
 
     #[test]
     fn parse_src_file() {
-        let res = parse_file("./src/programs/arith_mov");
+        let res = parse_file("./src/debugger/arith_mov");
         let expected = vec![
-            INSTR::MOVI(0, 42),
-            INSTR::MOV(0, 0),
-            INSTR::ADDR(0, 0, 0),
-            INSTR::ADDI(0, 42),
-            INSTR::ADD(0, 42, 42),
-            INSTR::SUBR(0, 0, 0),
-            INSTR::SUBI(0, 42),
-            INSTR::SUB(0, 42, 42)
+            Instr::Movi(0, 42),
+            Instr::Mov(0, 0),
+            Instr::Addr(0, 0, 0),
+            Instr::Addi(0, 42),
+            Instr::Add(0, 42, 42),
+            Instr::Subr(0, 0, 0),
+            Instr::Subi(0, 42),
+            Instr::Sub(0, 42, 42)
         ];
         match res {
             Ok(v) => {

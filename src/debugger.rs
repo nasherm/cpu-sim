@@ -1,8 +1,10 @@
-use crate::cpu::cpu;
+use crate::cpu::{cpu, util};
 use text_io::read;
 use std::io;
 use std::io::Write;
 use std::iter::Iterator;
+use std::borrow::Borrow;
+
 pub struct Debugger{
     cpu: cpu::CPU,
 }
@@ -22,7 +24,8 @@ impl Debugger{
         i - instruction memory\n\
         n - execute a clock step\n\
         c - cpu state\n\
-        a - add instruction \n");
+        a - add instruction \
+        l - load source file");
     }
 
     fn print_collection<T>(&self, collection:std::slice::Iter<'_, T>, line_size: usize)
@@ -31,7 +34,7 @@ impl Debugger{
         let mut line: Vec<String> = Vec::new();
         let mut index = 1;
         for (i, val) in collection.enumerate(){
-            let s = format!("reg[{}] ={:?}", i, val);
+            let s = format!("addr[{}] ={:?}", i, val);
             line.push(s.clone());
 
             if index % line_size == 0 {
@@ -72,14 +75,34 @@ impl Debugger{
         loop {
             print!("+> ");
             let _ = io::stdout().flush();
-            let line:String = read!("{}\n");
+            let line: String = read!("{}\n");
             match line.as_str(){
                 "q" => break,
                 "h" => self.print_commands(),
                 "r" => self.print_registers(10),
-                "i" => self.print_instruction_mem(10),
+                "i" => self.print_instruction_mem(5),
                 "n" => self.clock_tick(),
                 "c" => self.print_cpu_state(),
+                "a" => {
+                    print!("-> ");
+                    let _ = io::stdout().flush();
+                    let instr_string: String = read!("{}\n");
+                    let parsed_instr = util::parse_string(&instr_string);
+                    match parsed_instr {
+                        Ok(i) => self.cpu.instruction_mem.push(i),
+                        Err(e) => println!("failed to parse instruction {}", e.as_str()),
+                    }
+                },
+                "l" => {
+                    print!("FILE <- ");
+                    let _ = io::stdout().flush();
+                    let file_name: String = read!("{}\n");
+                    let src_parsed = util::parse_file(file_name.as_str());
+                    match src_parsed{
+                        Ok(v) => self.cpu.load_instructions(v),
+                        Err(e) => println!("failed to load source file"),
+                    }
+                },
                 _ => println!("Couldn't decode instruction")
             }
         }
