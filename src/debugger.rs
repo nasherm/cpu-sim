@@ -3,7 +3,6 @@ use text_io::read;
 use std::io;
 use std::io::Write;
 use std::iter::Iterator;
-use std::borrow::Borrow;
 
 pub struct Debugger{
     cpu: cpu::CPU,
@@ -100,7 +99,7 @@ impl Debugger{
                     let src_parsed = util::parse_file(file_name.as_str());
                     match src_parsed{
                         Ok(v) => self.cpu.load_instructions(v),
-                        Err(e) => println!("failed to load source file"),
+                        Err(e) => println!("failed to load source file: {}", e.to_string()),
                     }
                 },
                 _ => println!("Couldn't decode instruction")

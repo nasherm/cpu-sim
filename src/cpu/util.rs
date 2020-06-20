@@ -165,7 +165,7 @@ mod tests{
 
     #[test]
     fn parse_src_file() {
-        let res = parse_file("./src/debugger/arith_mov");
+        let res = parse_file("./src/programs/arith_mov");
         let expected = vec![
             Instr::Movi(0, 42),
             Instr::Mov(0, 0),
