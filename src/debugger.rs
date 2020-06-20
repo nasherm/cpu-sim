@@ -3,6 +3,7 @@ use text_io::read;
 use std::io;
 use std::io::Write;
 use std::iter::Iterator;
+use std::slice::Iter;
 
 pub struct Debugger{
     cpu: cpu::CPU,
@@ -23,11 +24,11 @@ impl Debugger{
         i - instruction memory\n\
         n - execute a clock step\n\
         c - cpu state\n\
-        a - add instruction \
+        a - add instruction \n\
         l - load source file");
     }
 
-    fn print_collection<T>(&self, collection:std::slice::Iter<'_, T>, line_size: usize)
+    fn print_collection<T>(&self, collection:Iter<T>, line_size: usize)
     where T:std::fmt::Debug
     {
         let mut line: Vec<String> = Vec::new();
@@ -54,7 +55,11 @@ impl Debugger{
     }
 
     fn print_instruction_mem(&self, line_size: usize) {
-        self.print_collection(self.cpu.instruction_mem.iter(), line_size)
+        let mut collection = Vec::new();
+        for t in self.cpu.instruction_mem.iter() {
+            collection.push(t.clone());
+        }
+        self.print_collection(collection.iter(), line_size)
     }
 
     fn clock_tick(&mut self) {
@@ -88,7 +93,7 @@ impl Debugger{
                     let instr_string: String = read!("{}\n");
                     let parsed_instr = util::parse_string(&instr_string);
                     match parsed_instr {
-                        Ok(i) => self.cpu.instruction_mem.push(i),
+                        Ok(i) => self.cpu.instruction_mem.push_back(i),
                         Err(e) => println!("failed to parse instruction {}", e.as_str()),
                     }
                 },

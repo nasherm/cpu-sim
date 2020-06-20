@@ -1,0 +1,3 @@
+mov r1 #42
+mov r2 #42
+add r0 r1 r2

@@ -30,7 +30,7 @@ pub enum Stage {
 }
 
 pub struct CPU {
-    pub instruction_mem: Vec<Instr>,
+    pub instruction_mem: VecDeque<Instr>,
     pub registers: [u32; 256],
     pub current_instruction: Instr,
     pub prev_instruction: Instr,
@@ -43,7 +43,7 @@ pub struct CPU {
 impl CPU{
     pub fn new() -> CPU{
         CPU{
-            instruction_mem: Vec::new(),
+            instruction_mem: VecDeque::new(),
             registers: [0; 256],
             current_instruction: Instr::Nop,
             prev_instruction: Instr::Nop,
@@ -54,7 +54,7 @@ impl CPU{
         }
     }
 
-    pub fn load_instr_vec(&mut self, instrs:&Vec<Instr>) {
+    pub fn load_instr_vec(&mut self, instrs:&VecDeque<Instr>) {
         self.instruction_mem = instrs.clone();
     }
 
@@ -73,17 +73,23 @@ impl CPU{
         self.ticks += 1;
     }
 
+    pub fn run_to_end(&mut self) -> () {
+        while self.instruction_mem.len() > 0 || self.current_instruction != Instr::Nop{
+            self.clock_tick()
+        }
+    }
+
     pub fn load_instructions(&mut self, instructions: Vec<Result<Instr, String>>) -> () {
         for res in instructions {
             match res {
-                Ok(i) => self.instruction_mem.push(i),
+                Ok(i) => self.instruction_mem.push_back(i),
                 Err(e) => panic!("Instruction not loaded | {:?}", e),
             }
         }
     }
 
     fn set_next_instruction (&mut self) {
-        let instr = self.instruction_mem.pop();
+        let instr = self.instruction_mem.pop_front();
         self.prev_instruction = self.current_instruction.clone();
         self.current_instruction =  match instr {
             Some(i) => i,
@@ -116,22 +122,27 @@ impl CPU{
     }
 
     // TODO: some way of checking whether functional units can be issued i.e. check dependencies before calling issue
-    fn issue_alutask(&mut self, x: u32, y: u32, f: impl FnMut(u32, u32)->u32 + 'static) -> () {
+    fn issue_alutask(&mut self, instr: Instr, x: u32, y: u32, f: impl FnMut(u32, u32)->u32 + 'static) -> () {
         let mut alu = ALU::new();
-        alu.issue(x, y, f);
+        alu.issue(instr,x, y, f);
         self.task_units.push_back(Box::new(alu));
     }
 
 
     // Decode instruction in memory
     fn decode(&mut self) -> Stage {
+        let current_instruction = self.current_instruction.clone();
         match self.current_instruction {
-            Instr::Add(_, x, y) => {
-                self.issue_alutask(x, y, |x, y| x + y);
+            Instr::Add(_, src1, src2) => {
+                let x = self.registers[src1 as usize];
+                let y = self.registers[src2 as usize];
+                self.issue_alutask(current_instruction, x, y, |x, y| x + y);
                 Stage::Execute
             }
-            Instr::Sub(_, x, y) => {
-                self.issue_alutask(x, y, |x, y| x - y);
+            Instr::Sub(_, src1, src2) => {
+                let x = self.registers[src1 as usize];
+                let y = self.registers[src2 as usize];
+                self.issue_alutask(current_instruction, x, y, |x, y| x - y);
                 Stage::Execute
             }
             _ => Stage::Execute
@@ -140,14 +151,22 @@ impl CPU{
 
     // Execute instruction in memory
     fn execute(&mut self) -> Stage {
-        // for t in self.task_units {
-        //     ()
-        // }
+        for t in self.task_units.iter_mut() {
+            t.execute()
+        }
         Stage::WriteBack
     }
 
     // Write back result
     fn writeback(&mut self) -> Stage {
+        for t in self.task_units.iter() {
+            let result = t.result();
+            match t.instr() {
+                Instr::Add(dest, _, _) => self.registers[dest as usize] = result,
+                Instr::Sub(dest, _, _) => self.registers[dest as usize] = result,
+                _ => ()
+            }
+        }
         Stage::Fetch
     }
 }
@@ -156,14 +175,15 @@ impl CPU{
 #[cfg(test)]
 mod tests {
     use crate::cpu::cpu::*;
+    use std::collections::VecDeque;
 
     #[test]
     fn mov_tests(){
         let mut cpu = CPU::new();
-        cpu.load_instr_vec(&vec![
-            Instr::Mov(0, 2),
-            Instr::Movi(2, 42)
-        ]);
+        let mut instructions = VecDeque::new();
+        instructions.push_back(Instr::Movi(2, 42));
+        instructions.push_back(Instr::Mov(0, 2));
+        cpu.load_instr_vec(&instructions);
         cpu.clock_tick();
         assert_eq!(cpu.ticks, 1);
         assert_eq!(cpu.registers[2], 42);
@@ -172,5 +192,18 @@ mod tests {
         assert_eq!(cpu.ticks, 2);
         assert_eq!(cpu.registers[0], 42);
         assert_eq!(cpu.next_stage, Stage::Fetch);
+    }
+
+    #[test]
+    fn add_sub_tests() {
+        let mut cpu = CPU::new();
+        let mut instructions = VecDeque::new();
+        instructions.push_back(Instr::Movi(0, 42));
+        instructions.push_back(Instr::Add(1, 0, 0));
+        instructions.push_back(Instr::Sub(2, 1, 0));
+        cpu.load_instr_vec(&instructions);
+        cpu.run_to_end();
+        assert_eq!(cpu.registers[1], 84);
+        assert_eq!(cpu.registers[2], 42);
     }
 }
