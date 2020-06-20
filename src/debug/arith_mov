@@ -1,8 +1,0 @@
-MOVI r0 #42
-MOV r0 r0
-ADDR r0 r0 r0
-ADDI r0 #42
-ADD r0 #42 #42
-SUBR r0 r0 r0
-SUBI r0 #42
-SUB r0 #42 #42

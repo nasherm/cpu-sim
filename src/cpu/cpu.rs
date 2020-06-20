@@ -9,14 +9,14 @@ ISA
     */
 #[derive(Debug, Clone, PartialEq)]
 pub enum INSTR {
-    MOVI(u32, u32), //  MOVI dest val (reg[dest]<-val) [dest] is a register
-    MOV(u32, u32), // MOV dest src (reg[dest] <- reg[src])
-    ADDI(u32, u32), // ADDI dest val (reg[dest] <- reg[dest] + val)
-    SUBI(u32, u32), // SUBI dest val (reg[dest] <-reg[dest] - val)
-    ADDR(u32, u32, u32), // ADDR dest src1 src2 (reg[dest] <- reg[src1] + reg[src2])
-    ADD (u32, u32, u32), // ADD dest val1 val2 (reg[dest] <- val1 + val2)
-    SUBR(u32, u32, u32), // SUBR dest src1 src2 (reg[dest] <- reg[src1] - reg[src2])
-    SUB (u32, u32, u32), // SUB dest val1 val2 (reg[dest]<- val1 - val2)
+    MOVI(u32, u32), //  movi dest val (reg[dest]<-val) [dest] is a register
+    MOV(u32, u32), // mov dest src (reg[dest] <- reg[src])
+    ADDI(u32, u32), // addi dest val (reg[dest] <- reg[dest] + val)
+    SUBI(u32, u32), // subi dest val (reg[dest] <-reg[dest] - val)
+    ADDR(u32, u32, u32), // addr dest src1 src2 (reg[dest] <- reg[src1] + reg[src2])
+    ADD (u32, u32, u32), // add dest val1 val2 (reg[dest] <- val1 + val2)
+    SUBR(u32, u32, u32), // subr dest src1 src2 (reg[dest] <- reg[src1] - reg[src2])
+    SUB (u32, u32, u32), // sub dest val1 val2 (reg[dest]<- val1 - val2)
     NOP,
 }
 
@@ -114,9 +114,9 @@ impl CPU{
             _ => Stage::Decode
         }
     }
+
     // TODO: some way of checking whether functional units can be issued i.e. check dependencies before calling issue
     fn issue_alutask(&mut self, x: u32, y: u32, f: impl FnMut(u32, u32)->u32 + 'static) -> () {
-        // TODO: keeping track of out-of-order execution results via reorder-buffer
         let mut alu = ALU::new();
         alu.issue(x, y, f);
         self.alu_tasks.push_back(Box::new(alu));
