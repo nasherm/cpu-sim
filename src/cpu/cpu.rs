@@ -33,7 +33,7 @@ pub struct CPU {
     pub next_instruction: Instr,
     pub next_stage: Stage,
     ticks: u32,
-    task_units: VecDeque<Box<dyn Unit>>,
+    alu_units: Vec<ALU>
 }
 
 
@@ -47,7 +47,7 @@ impl CPU{
             next_instruction: Instr::Nop,
             next_stage: Stage::Fetch,
             ticks: 0,
-            task_units: VecDeque::new(),
+            alu_units: Vec::new(),
         }
     }
 
@@ -119,16 +119,24 @@ impl CPU{
     }
 
     // TODO: some way of checking whether functional units can be issued i.e. check dependencies before calling issue
-    fn issue_alutask(&mut self, instr: Instr, x: u32, y: u32, f: impl FnMut(u32, u32)->u32 + 'static) -> () {
-        let mut alu = ALU::new();
-        alu.issue(instr,x, y, f);
-        self.task_units.push_back(Box::new(alu));
+    fn issue_alutask(&mut self, instr: &Instr, x: u32, y: u32, op: Op) -> (){
+        let mut assigned = false;
+        for alu in self.alu_units.iter_mut(){
+            if alu.avail(){
+                alu.issue(instr.clone(),x, y, op.clone());
+                assigned = true;
+                break;
+            }
+        }
+        // TODO: limits on number of ALUs at any time
+        if !assigned {
+            self.alu_units.push(ALU::new());
+            self.issue_alutask(instr, x, y,op.clone());
+        }
     }
 
     // Decode instruction in memory
     fn decode(&mut self) -> Stage {
-        let add = |x:u32, y:u32| x + y;
-        let sub = |x, y| x - y;
         let current_instruction = self.current_instruction.clone();
         match self.current_instruction {
             Instr::Add(_, src1, src2)
@@ -137,9 +145,9 @@ impl CPU{
                 let y = self.registers[src2 as usize];
                 match self.current_instruction{
                     Instr::Add(_, _, _)=>
-                        self.issue_alutask(current_instruction, x, y, add),
+                        self.issue_alutask(&current_instruction, x, y, Op::Add),
                     Instr::Sub(_, _, _) =>
-                        self.issue_alutask(current_instruction, x, y, sub),
+                        self.issue_alutask(&current_instruction, x, y, Op::Sub),
                     _ => (),
                 };
                 Stage::Execute
@@ -149,9 +157,9 @@ impl CPU{
                 let x = self.registers[dest as usize];
                 match self.current_instruction {
                     Instr::Addi(_, _) =>
-                        self.issue_alutask(current_instruction, x, data, add),
+                        self.issue_alutask(&current_instruction, x, data, Op::Add),
                     Instr::Subi(_, _) =>
-                        self.issue_alutask(current_instruction, x, data, sub),
+                        self.issue_alutask(&current_instruction, x, data, Op::Sub),
                     _ => ()
                 };
                 Stage::Execute
@@ -162,7 +170,7 @@ impl CPU{
 
     // Execute instruction in memory
     fn execute(&mut self) -> Stage {
-        for t in self.task_units.iter_mut() {
+        for t in self.alu_units.iter_mut() {
             t.execute()
         }
         Stage::WriteBack
@@ -170,7 +178,7 @@ impl CPU{
 
     // Write back result
     fn writeback(&mut self) -> Stage {
-        for t in self.task_units.iter() {
+        for t in self.alu_units.iter() {
             let result = t.result();
             match t.instr() {
                 Instr::Add(dest, _, _) => self.registers[dest as usize] = result,
