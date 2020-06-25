@@ -5,14 +5,16 @@ use std::collections::VecDeque;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Instr {
-    Movi(u32, u32), //  movi dest val (reg[dest]<-val) [dest] is a register
-    Mov(u32, u32), // mov dest src (reg[dest] <- reg[src])
-    Addi(u32, u32), // addi dest val (reg[dest] <- reg[dest] + val)
-    Subi(u32, u32), // subi dest val (reg[dest] <-reg[dest] - val)
+    Movi(u32, u32),      //  movi dest val (reg[dest]<-val) [dest] is a register
+    Mov(u32, u32),       // mov dest src (reg[dest] <- reg[src])
+    Addi(u32, u32),      // addi dest val (reg[dest] <- reg[dest] + val)
+    Subi(u32, u32),      // subi dest val (reg[dest] <-reg[dest] - val)
     Addr(u32, u32, u32), // addr dest src1 src2 (reg[dest] <- reg[src1] + reg[src2])
-    Add(u32, u32, u32), // add dest val1 val2 (reg[dest] <- val1 + val2)
+    Add(u32, u32, u32),  // add dest val1 val2 (reg[dest] <- val1 + val2)
     Subr(u32, u32, u32), // subr dest src1 src2 (reg[dest] <- reg[src1] - reg[src2])
-    Sub(u32, u32, u32), // sub dest val1 val2 (reg[dest]<- val1 - val2)
+    Sub(u32, u32, u32),  // sub dest val1 val2 (reg[dest]<- val1 - val2)
+    Cmp(u32, u32),       // cmp src1 src2 (set appropriate flag in flags register)
+    Cmpi(u32, u32),      // cmpi src1 val (set appropriate flag in flags register)
     Nop,
 }
 
@@ -33,7 +35,8 @@ pub struct CPU {
     pub next_instruction: Instr,
     pub next_stage: Stage,
     ticks: u32,
-    alu_units: Vec<ALU>
+    alu_units: Vec<ALU>,
+    flags: u32,
 }
 
 
@@ -48,6 +51,7 @@ impl CPU{
             next_stage: Stage::Fetch,
             ticks: 0,
             alu_units: Vec::new(),
+            flags: 0,
         }
     }
 
@@ -98,6 +102,10 @@ impl CPU{
         } else {
             self.next_instruction = Instr::Nop;
         }
+    }
+
+    fn compare(&mut self) {
+
     }
 
     // Fetch instruction from memory
@@ -181,10 +189,10 @@ impl CPU{
         for t in self.alu_units.iter() {
             let result = t.result();
             match t.instr() {
-                Instr::Add(dest, _, _) => self.registers[dest as usize] = result,
-                Instr::Sub(dest, _, _) => self.registers[dest as usize] = result,
-                Instr::Addi(dest, _) => self.registers[dest as usize] = result,
-                Instr::Subi(dest, _) => self.registers[dest as usize] = result,
+                Instr::Add(dest, _, _)
+                | Instr::Sub(dest, _, _)
+                | Instr::Addi(dest, _)
+                | Instr::Subi(dest, _) => self.registers[dest as usize] = result,
                 _ => ()
             }
         }

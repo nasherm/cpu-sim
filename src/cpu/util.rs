@@ -3,59 +3,60 @@ use std::io::{self, prelude::*, BufReader, Error, ErrorKind};
 use std::vec::Vec;
 use std::string::String;
 use super::cpu::Instr;
+fn string_to_instr(op: &str)-> (fn(u32, u32) -> Instr){
+    match op {
+        "cmp" => Instr::Cmp,
+        "cmpi" => Instr::Cmpi,
+        "mov" => Instr::Mov,
+        "movi" => Instr::Movi,
+        "addi" => Instr::Addi,
+        "subi" => Instr::Subi,
+        _ => |_, _| {Instr::Nop},
+    }
+}
+
+fn string_to_3arginstr(op: &str)-> (fn(u32, u32, u32) -> Instr){
+    match op {
+        "add" => Instr::Add,
+        "addr" => Instr::Addr,
+        "sub" => Instr::Sub,
+        "subr" => Instr::Subr,
+        _ => |_, _, _| {Instr::Nop},
+    }
+}
 
 fn to_instr(v: &mut Vec<&str>) -> Result<Instr, String>{
-    let op = v[0];
-    match op{
-        "mov" | "movi" | "addi" | "subi" =>{
-            let arg2 = v.pop();
-            let arg1 = v.pop();
-            match (arg1, arg2){
-                (Some(x), Some(y)) =>{
+    match v[0]{
+        "cmp"  |
+        "cmpi" |
+        "mov"  |
+        "movi" |
+        "addi" |
+        "subi" =>{
+            match (v.pop(), v.pop()){
+                (Some(y), Some(x)) =>{
                     let dest = x[1..].to_string().parse::<u32>().unwrap();
                     let val  = y[1..].to_string().parse::<u32>().unwrap();
-                    if op == "mov" {
-                        Ok(Instr::Mov(dest, val))
-                    }
-                    else if op == "movi" {
-                        Ok(Instr::Movi(dest, val))
-                    }
-                    else if op == "addi"{
-                        Ok(Instr::Addi(dest, val))
-                    }
-                    else {
-                        Ok(Instr::Subi(dest, val))
-                    }
+                    Ok(string_to_2arginstr(v[0])(dest, val))
                 }
-                _ => Err(format!("Not enough arguments to instr = {}", op)),
+                _ => Err(format!("Not enough arguments to instr = {}", v[0])),
             }
-        }
-        "add" | "addr" | "sub" | "subr" => {
-            let arg3 = v.pop();
-            let arg2 = v.pop();
-            let arg1 = v.pop();
-            match (arg1, arg2, arg3){
-                (Some(x), Some(y), Some(z)) => {
+        },
+        "add" |
+        "addr"|
+        "sub" |
+        "subr" => {
+            match (v.pop(), v.pop(), v.pop()){
+                (Some(z), Some(y), Some(x)) => {
                     let dest = x[1..].to_string().parse::<u32>().unwrap();
                     let val1 = y[1..].to_string().parse::<u32>().unwrap();
                     let val2 = z[1..].to_string().parse::<u32>().unwrap();
-                    if op == "add"{
-                        Ok(Instr::Add(dest, val1, val2))
-                    }
-                    else if op == "sub"{
-                        Ok(Instr::Sub(dest, val1, val2))
-                    }
-                    else if op == "addr" {
-                        Ok(Instr::Addr(dest, val1, val2))
-                    }
-                    else {
-                        Ok(Instr::Subr(dest, val1, val2))
-                    }
+                    Ok(string_to_3arginstr(v[0])(dest, val1, val2))
                 },
-                _ => Err(format!("Not enough arguments to instr = {}", op)),
+                _ => Err(format!("Not enough arguments to instr = {}", v[0])),
             }
-        }
-        _ => Err(format!("can't read instruction = {}", op)),
+        },
+        _ => Err(format!("can't read instruction = {}", v[0])),
     }
 }
 
@@ -159,7 +160,7 @@ mod tests{
         let r = to_instr(&mut instr);
         match r{
             Ok(Instr::Subr(0, 1, 2)) => (),
-            _ => panic!(format!("Failed to parse SUBR instruction = {:?}", instr))
+            _ => panic!("Failed to parse SUBR instruction = {:?}", instr)
         }
     }
 
@@ -187,6 +188,26 @@ mod tests{
                 }
             }
             Err(e) => panic!(e.to_string()),
+        }
+    }
+
+    #[test]
+    fn parse_cmp() {
+        let mut instr = vec!["cmp", "r0", "r1"];
+        let result = to_instr(&mut instr);
+        match result {
+            Ok(instr) => assert_eq!(instr, Instr::Cmp(0, 1)),
+            Err(e) => panic!("Failed to parse cmp instruction: {}", e),
+        }
+    }
+
+    #[test]
+    fn parse_cmpi(){
+        let mut instr = vec!["cmpi", "r0", "#1"];
+        let result = to_instr(&mut instr);
+        match result {
+            Ok(instr) => assert_eq!(instr, Instr::Cmpi(0, 1)),
+            Err(e) => panic!("Failed to parse cmpi instruction: {}", e),
         }
     }
 }
