@@ -37,7 +37,7 @@ fn to_instr(v: &mut Vec<&str>) -> Result<Instr, String>{
                 (Some(y), Some(x)) =>{
                     let dest = x[1..].to_string().parse::<u32>().unwrap();
                     let val  = y[1..].to_string().parse::<u32>().unwrap();
-                    Ok(string_to_2arginstr(v[0])(dest, val))
+                    Ok(string_to_instr(v[0])(dest, val))
                 }
                 _ => Err(format!("Not enough arguments to instr = {}", v[0])),
             }
